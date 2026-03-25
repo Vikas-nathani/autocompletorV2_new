@@ -14,9 +14,9 @@ from httpx import ASGITransport, AsyncClient
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from app import app
-from note_api.models import NoteCompleteResult
-from note_api.section_config import SECTION_SEMANTIC_TYPES
+from backend import app
+from backend.models.models import NoteCompleteResult
+from backend.services.section_config import SECTION_SEMANTIC_TYPES
 
 
 @pytest.mark.anyio

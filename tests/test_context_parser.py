@@ -3,9 +3,8 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "note_api"))
 
-from context_parser import (
+from backend.services.context_parser import (
     calculate_boost_score,
     find_matching_context_terms,
     parse_patient_context,

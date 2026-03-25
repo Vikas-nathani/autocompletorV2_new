@@ -1,1 +1,16 @@
 tests/sample_patient.json
+
+# Python caches
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+.venv/
+venv/
+
+# Runtime artifacts
+logs/
+data/*.log
+
+# Pytest/cache
+.pytest_cache/

@@ -7,11 +7,20 @@ filtering based on the selected note section.
 
 from __future__ import annotations
 
+import importlib
 from typing import Optional
 
 import httpx
 
-import app as legacy_app
+
+class _LegacyAppProxy:
+    def __getattr__(self, name: str):
+        module = importlib.import_module("backend.app")
+        return getattr(module, name)
+
+
+legacy_app = _LegacyAppProxy()
+
 from .section_config import (
     CHV_EXCLUDED_SECTIONS,
     MEDICATION_TRUSTED_SOURCES,

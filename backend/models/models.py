@@ -10,7 +10,7 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
-from .config import NOTE_API_DEFAULT_ROWS, NOTE_API_MAX_ROWS, VALID_SECTIONS
+from backend.core.config import NOTE_API_DEFAULT_ROWS, NOTE_API_MAX_ROWS, VALID_SECTIONS
 
 
 class NoteCompleteRequest(BaseModel):

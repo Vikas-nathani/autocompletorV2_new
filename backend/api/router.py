@@ -7,18 +7,27 @@ suggestions and a discovery endpoint for available sections.
 from __future__ import annotations
 
 from datetime import date
+import importlib
 import json
 import time
 
 import httpx
-import app as legacy_app
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
-from .config import NOTE_API_DEFAULT_ROWS, NOTE_API_MAX_ROWS, VALID_SECTIONS
-from .context_parser import find_matching_context_terms, parse_patient_context, parse_patient_context_json
-from .models import (
+
+class _LegacyAppProxy:
+    def __getattr__(self, name: str):
+        module = importlib.import_module("backend.app")
+        return getattr(module, name)
+
+
+legacy_app = _LegacyAppProxy()
+
+from backend.core.config import NOTE_API_DEFAULT_ROWS, NOTE_API_MAX_ROWS, VALID_SECTIONS
+from backend.services.context_parser import find_matching_context_terms, parse_patient_context, parse_patient_context_json
+from backend.models.models import (
     NoteCompleteContextRequest,
     NoteCompleteContextResult,
     NoteCompleteContextResponse,
@@ -26,8 +35,8 @@ from .models import (
     NoteCompleteResponse,
     NoteCompleteResult,
 )
-from .search import note_complete
-from .section_config import SECTION_SEMANTIC_TYPES
+from backend.services.search import note_complete
+from backend.services.section_config import SECTION_SEMANTIC_TYPES
 
 router = APIRouter(prefix="/api/note", tags=["Note Completion"])
 

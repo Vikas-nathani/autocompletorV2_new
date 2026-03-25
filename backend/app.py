@@ -1010,5 +1010,5 @@ async def stats():
         "top_semantic_types": sem_types,
     }
 
-from note_api import router as note_router
+from backend.api.router import router as note_router
 app.include_router(note_router)
