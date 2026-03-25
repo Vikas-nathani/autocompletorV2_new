@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+
+tests/
+scripts/
+data/
+
+.git
+.gitignore
+
+*.log
+.env
+
+README.md

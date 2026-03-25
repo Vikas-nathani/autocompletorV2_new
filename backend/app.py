@@ -133,7 +133,9 @@ SYNONYM_EXPANSIONS = {
 # ─────────────────────────────────────────
 # CONFIG
 # ─────────────────────────────────────────
-SOLR_URL = "http://localhost:8983/solr/umls_core"
+import os
+
+SOLR_URL = os.getenv("SOLR_URL")
 SEARCH_LOG_PATH = "/var/log/clinical_copilot/search.log"
 
 
@@ -1012,3 +1014,6 @@ async def stats():
 
 from backend.api.router import router as note_router
 app.include_router(note_router)
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("backend.app:app", host="0.0.0.0", port=8000, reload=True)

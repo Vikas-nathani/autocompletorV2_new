@@ -1,0 +1,24 @@
+version: "3.8"
+
+services:
+
+  solr:
+    image: solr:9
+    container_name: solr
+    ports:
+      - "8983:8983"
+    volumes:
+      - /var/solr/data:/var/solr/data
+    command:
+      - solr-precreate
+      - umls_core
+
+  backend:
+    build: .
+    container_name: backend
+    ports:
+      - "8000:8000"
+    depends_on:
+      - solr
+    env_file:
+      - .env
