@@ -1,0 +1,1930 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clinical Copilot Engine</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #0a0e1a;
+    --surface:   #111827;
+    --border:    #1e2d45;
+    --accent:    #00d4ff;
+    --accent2:   #7c3aed;
+    --text:      #e2e8f0;
+    --muted:     #64748b;
+    --success:   #10b981;
+    --warning:   #f59e0b;
+    --danger:    #ef4444;
+    --card:      #141d2e;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -20%, rgba(0,212,255,0.08), transparent),
+      radial-gradient(ellipse 60% 40% at 80% 80%, rgba(124,58,237,0.06), transparent);
+  }
+
+  /* ── HEADER ─────────────────────────────── */
+  header {
+    padding: 24px 40px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    backdrop-filter: blur(10px);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(10,14,26,0.9);
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .logo-icon {
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+
+  .logo-text {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 18px;
+    letter-spacing: -0.5px;
+  }
+
+  .logo-text span {
+    color: var(--accent);
+  }
+
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--success);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* ── MAIN ────────────────────────────────── */
+  main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 48px 40px;
+  }
+
+  .hero {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+
+  .hero h1 {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: clamp(32px, 5vw, 52px);
+    letter-spacing: -2px;
+    line-height: 1.1;
+    margin-bottom: 12px;
+  }
+
+  .hero h1 em {
+    font-style: normal;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hero p {
+    color: var(--muted);
+    font-size: 16px;
+    font-weight: 300;
+  }
+
+  /* ── SEARCH BOX ──────────────────────────── */
+  .search-wrapper {
+    position: relative;
+    margin-bottom: 24px;
+  }
+
+  .ghost-completion {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    color: rgba(226,232,240,0.35);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 18px;
+    font-weight: 400;
+    letter-spacing: -0.3px;
+    pointer-events: none;
+    white-space: pre;
+    z-index: 3;
+    display: none;
+  }
+
+  .search-dropdown {
+    position: absolute;
+    top: calc(100% - 1px);
+    left: 0;
+    right: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 0 0 12px 12px;
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
+    max-height: 420px;
+    overflow-y: auto;
+    z-index: 200;
+    display: none;
+  }
+
+  .dropdown-item {
+    width: 100%;
+    padding: 12px 16px;
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    text-align: left;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    cursor: pointer;
+  }
+
+  .dropdown-item:hover,
+  .dropdown-item.active {
+    background: rgba(0, 212, 255, 0.1);
+    color: var(--accent);
+  }
+
+  .dropdown-item mark {
+    background: transparent;
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  .search-icon {
+    position: absolute;
+    left: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted);
+    font-size: 20px;
+    pointer-events: none;
+  }
+
+  #searchInput {
+    width: 100%;
+    padding: 20px 20px 20px 56px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 18px;
+    font-weight: 400;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    letter-spacing: -0.3px;
+  }
+
+  #searchInput::placeholder { color: var(--muted); }
+
+  #searchInput:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(0,212,255,0.1), 0 0 30px rgba(0,212,255,0.05);
+  }
+
+  .search-meta {
+    position: absolute;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .kbd {
+    background: var(--border);
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  /* ── FILTERS ─────────────────────────────── */
+  .filters {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 12px;
+    margin-bottom: 32px;
+    align-items: end;
+  }
+
+  .filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .filter-group label {
+    font-size: 11px;
+    font-family: 'DM Mono', monospace;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .filter-group select {
+    padding: 10px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+
+  .filter-group select:focus { border-color: var(--accent); }
+
+  .toggle-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .toggle-group label {
+    font-size: 11px;
+    font-family: 'DM Mono', monospace;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .toggle-btn {
+    padding: 10px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .toggle-btn.active {
+    background: rgba(0,212,255,0.1);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* ── RESULTS HEADER ──────────────────────── */
+  .results-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    min-height: 28px;
+  }
+
+  .results-count {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .results-count strong {
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  .results-time {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  /* ── RESULTS LIST ────────────────────────── */
+  #results {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .result-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+    align-items: start;
+    transition: border-color 0.15s, transform 0.15s;
+    animation: fadeIn 0.2s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .result-card:hover {
+    border-color: rgba(0,212,255,0.3);
+    transform: translateX(2px);
+  }
+
+  .result-term {
+    font-family: 'Syne', sans-serif;
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--text);
+    letter-spacing: -0.3px;
+    margin-bottom: 6px;
+  }
+
+  .result-term mark {
+    background: rgba(0,212,255,0.2);
+    color: var(--accent);
+    border-radius: 3px;
+    padding: 0 2px;
+  }
+
+  .result-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .badge {
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-family: 'DM Mono', monospace;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+  }
+
+  .badge-semantic {
+    background: rgba(124,58,237,0.15);
+    color: #a78bfa;
+    border: 1px solid rgba(124,58,237,0.2);
+  }
+
+  .badge-source {
+    background: rgba(16,185,129,0.1);
+    color: #34d399;
+    border: 1px solid rgba(16,185,129,0.2);
+  }
+
+  .badge-tty {
+    background: rgba(245,158,11,0.1);
+    color: #fbbf24;
+    border: 1px solid rgba(245,158,11,0.2);
+  }
+
+  .badge-abbr {
+    background: rgba(239,68,68,0.1);
+    color: #f87171;
+    border: 1px solid rgba(239,68,68,0.2);
+  }
+
+  .result-code {
+    text-align: right;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .result-code .label {
+    display: block;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 3px;
+    color: var(--border);
+  }
+
+  .result-code .value {
+    color: var(--muted);
+  }
+
+  /* ── EMPTY / LOADING STATES ──────────────── */
+  .state-message {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+  }
+
+  .state-message .icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    display: block;
+    opacity: 0.4;
+  }
+
+  .state-message h3 {
+    font-family: 'Syne', sans-serif;
+    font-size: 18px;
+    margin-bottom: 8px;
+    color: var(--text);
+    opacity: 0.6;
+  }
+
+  .state-message p {
+    font-size: 14px;
+    font-weight: 300;
+  }
+
+  .loading-bar {
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2), var(--accent));
+    background-size: 200% 100%;
+    animation: shimmer 1s infinite;
+    border-radius: 2px;
+    margin-bottom: 24px;
+  }
+
+  @keyframes shimmer {
+    0%   { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  /* ── PAGINATION ──────────────────────────── */
+  .pagination {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 24px;
+  }
+
+  .page-btn {
+    padding: 8px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .page-btn:hover:not(:disabled) {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .page-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  .page-info {
+    padding: 8px 16px;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+  }
+
+  /* ── CLINICAL NOTE ──────────────────────── */
+  .note-section {
+    margin-top: 36px;
+  }
+
+  .patient-context-section {
+    margin-top: 36px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+    overflow: hidden;
+  }
+
+  .context-toggle {
+    width: 100%;
+    padding: 14px 16px;
+    background: transparent;
+    border: 0;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+  }
+
+  .context-body {
+    display: none;
+    border-top: 1px solid var(--border);
+    padding: 14px;
+  }
+
+  .context-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .context-label {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .context-clear-btn {
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  .context-clear-btn:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+
+  #patientContextInput {
+    width: 100%;
+    min-height: 150px;
+    background: #0f1726;
+    border: 1px solid #22334f;
+    border-radius: 10px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    line-height: 1.4;
+    padding: 12px;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  #patientContextInput:focus {
+    border-color: var(--accent);
+  }
+
+  .context-status {
+    margin-top: 8px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .context-status.loaded {
+    color: var(--success);
+  }
+
+  .context-status.invalid {
+    color: var(--danger);
+  }
+
+  .note-label {
+    display: block;
+    margin-bottom: 10px;
+    font-size: 12px;
+    font-family: 'DM Mono', monospace;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .note-editor-wrapper {
+    position: relative;
+    width: 100%;
+  }
+
+  .note-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .note-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px;
+  }
+
+  .clinical-note-area {
+    width: 100%;
+    min-height: 150px;
+    background: #0f1726;
+    border: 1px solid #22334f;
+    border-radius: 10px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    padding: 12px;
+    outline: none;
+    resize: vertical;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .clinical-note-area:focus {
+    border-color: var(--accent);
+    box-shadow: inset 0 0 0 1px rgba(0,212,255,0.25), 0 0 0 3px rgba(0,212,255,0.08);
+  }
+
+  .note-history-count {
+    position: absolute;
+    left: 0;
+    top: -20px;
+    font-size: 11px;
+    font-family: 'DM Mono', monospace;
+    color: var(--success);
+    display: none;
+  }
+
+  .note-history-star {
+    color: #fbbf24;
+    margin-right: 6px;
+  }
+
+  #clinicalNote {
+    width: 100%;
+    min-height: 400px;
+    background: #0f1726;
+    border: 1px solid #22334f;
+    border-radius: 12px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    padding: 16px;
+    outline: none;
+    resize: vertical;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  #clinicalNote::placeholder {
+    color: var(--muted);
+  }
+
+  #clinicalNote:focus {
+    border-color: var(--accent);
+    box-shadow: inset 0 0 0 1px rgba(0,212,255,0.25), 0 0 0 3px rgba(0,212,255,0.08);
+  }
+
+  .note-ghost {
+    position: absolute;
+    color: rgba(226,232,240,0.35);
+    pointer-events: none;
+    white-space: pre;
+    z-index: 3;
+    display: none;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+  }
+
+  .note-dropdown {
+    position: absolute;
+    min-width: 260px;
+    max-width: 520px;
+    max-height: 320px;
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 12px 24px rgba(0,0,0,0.35);
+    z-index: 250;
+    display: none;
+  }
+
+  /* ── STATS BAR ───────────────────────────── */
+  .stats-bar {
+    display: flex;
+    gap: 24px;
+    padding: 16px 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+  }
+
+  .stat-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .stat-value {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 20px;
+    color: var(--accent);
+  }
+
+  .stat-label {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    font-family: 'DM Mono', monospace;
+  }
+
+  /* ── RESPONSIVE ──────────────────────────── */
+  @media (max-width: 640px) {
+    main { padding: 24px 16px; }
+    header { padding: 16px; }
+    .filters { grid-template-columns: 1fr; }
+    .stats-bar { gap: 16px; }
+    .note-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">⚕</div>
+    <div class="logo-text">Clinical <span>Copilot</span></div>
+  </div>
+  <div class="status-bar">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">Connecting...</span>
+  </div>
+</header>
+
+<main>
+  <div class="hero">
+    <h1>Medical Term <em>Autocomplete</em></h1>
+    <p>Search across 4,271,299 medical terms from UMLS — powered by Apache Solr</p>
+  </div>
+
+  <!-- Stats Bar -->
+  <div class="stats-bar">
+    <div class="stat-item">
+      <div class="stat-value">4.27M</div>
+      <div class="stat-label">Total Terms</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value">127</div>
+      <div class="stat-label">Categories</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value">45K+</div>
+      <div class="stat-label">Abbreviations</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value" id="statSources">15+</div>
+      <div class="stat-label">Sources</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value" id="statSpeed">—</div>
+      <div class="stat-label">Last Query (ms)</div>
+    </div>
+  </div>
+
+  <!-- Search -->
+  <div class="search-wrapper">
+    <span class="search-icon">🔍</span>
+    <input
+      type="text"
+      id="searchInput"
+      placeholder="Type a medical term... e.g. diab, hypert, card"
+      autocomplete="off"
+      spellcheck="false"
+    />
+    <span id="ghostCompletion" class="ghost-completion"></span>
+    <div class="search-meta">
+      <span class="kbd">live</span>
+    </div>
+    <div id="searchDropdown" class="search-dropdown"></div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters">
+    <div class="filter-group">
+      <label>Semantic Type</label>
+      <select id="filterSemantic">
+        <option value="">All Semantic Types</option>
+        <option value="Disease or Syndrome">Disease or Syndrome</option>
+        <option value="Finding">Finding</option>
+        <option value="Therapeutic or Preventive Procedure">Therapeutic or Preventive Procedure</option>
+        <option value="Pharmacologic Substance">Pharmacologic Substance</option>
+        <option value="Laboratory Procedure">Laboratory Procedure</option>
+        <option value="Neoplastic Process">Neoplastic Process</option>
+        <option value="Amino Acid, Peptide, or Protein">Amino Acid, Peptide, or Protein</option>
+        <option value="Gene or Genome">Gene or Genome</option>
+        <option value="Organic Chemical">Organic Chemical</option>
+        <option value="Clinical Attribute">Clinical Attribute</option>
+        <option value="Congenital Abnormality">Congenital Abnormality</option>
+        <option value="Injury or Poisoning">Injury or Poisoning</option>
+        <option value="Bacterium">Bacterium</option>
+        <option value="Virus">Virus</option>
+        <option value="Cell">Cell</option>
+        <option value="Enzyme">Enzyme</option>
+        <option value="Immunologic Factor">Immunologic Factor</option>
+        <option value="Intellectual Product">Intellectual Product</option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label>Source</label>
+      <select id="filterSource">
+        <option value="">All Sources</option>
+        <option value="SNOMEDCT_US">SNOMEDCT_US</option>
+        <option value="ICD10CM">ICD10CM</option>
+        <option value="MSH">MSH (MeSH)</option>
+        <option value="NCI">NCI</option>
+        <option value="RXNORM">RXNORM</option>
+        <option value="MEDCIN">MEDCIN</option>
+        <option value="LNC">LNC (LOINC)</option>
+        <option value="ICD10PCS">ICD10PCS</option>
+        <option value="OMIM">OMIM</option>
+        <option value="CHV">CHV</option>
+        <option value="PDQ">PDQ</option>
+        <option value="MTH">MTH</option>
+        <option value="MDR">MDR</option>
+        <option value="CPT">CPT</option>
+      </select>
+    </div>
+
+    <div class="toggle-group">
+      <label>Abbreviations</label>
+      <button class="toggle-btn" id="toggleAbbr" onclick="toggleAbbreviations()">
+        Show All
+      </button>
+    </div>
+  </div>
+
+  <!-- Results Header -->
+  <div class="results-header">
+    <div class="results-count" id="resultsCount"></div>
+    <div class="results-time" id="resultsTime"></div>
+  </div>
+
+  <!-- Loading Bar -->
+  <div class="loading-bar" id="loadingBar" style="display:none"></div>
+
+  <!-- Results -->
+  <div id="results">
+    <div class="state-message">
+      <span class="icon">⌨️</span>
+      <h3>Start typing to search</h3>
+      <p>Results appear instantly as you type</p>
+    </div>
+  </div>
+
+  <!-- Pagination -->
+  <div class="pagination" id="pagination" style="display:none">
+    <button class="page-btn" id="prevBtn" onclick="changePage(-1)">← Prev</button>
+    <span class="page-info" id="pageInfo"></span>
+    <button class="page-btn" id="nextBtn" onclick="changePage(1)">Next →</button>
+  </div>
+
+  <!-- Patient Context -->
+  <section class="patient-context-section">
+    <button type="button" class="context-toggle" id="patientContextToggle">Patient Context ▼</button>
+    <div class="context-body" id="patientContextBody">
+      <div class="context-controls">
+        <div class="context-label">Choose input mode for patient context</div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <button type="button" class="toggle-btn active" id="patientContextModeJson">Paste JSON</button>
+          <button type="button" class="toggle-btn" id="patientContextModeText">Paste Text</button>
+          <button type="button" class="context-clear-btn" id="clearContextBtn">Clear Context</button>
+        </div>
+      </div>
+      <textarea id="patientContextInput" spellcheck="false" placeholder="Paste structured patient JSON..." ></textarea>
+      <div class="context-status" id="patientContextStatus">No context loaded</div>
+    </div>
+  </section>
+
+  <!-- Clinical Note -->
+  <section class="note-section">
+    <div class="note-grid" id="noteGrid">
+      <div class="note-card">
+        <label class="note-label" for="note-chief-complaint">Chief Complaint</label>
+        <div class="note-editor-wrapper">
+          <div class="note-history-count" id="noteHistory-chief_complaint"></div>
+          <textarea id="note-chief-complaint" class="clinical-note-area" data-section="chief_complaint" placeholder="Type chief complaint..." spellcheck="false"></textarea>
+          <span id="noteGhost-chief_complaint" class="note-ghost"></span>
+          <div id="noteDropdown-chief_complaint" class="note-dropdown"></div>
+        </div>
+      </div>
+
+      <div class="note-card">
+        <label class="note-label" for="note-diagnosis">Diagnosis</label>
+        <div class="note-editor-wrapper">
+          <div class="note-history-count" id="noteHistory-diagnosis"></div>
+          <textarea id="note-diagnosis" class="clinical-note-area" data-section="diagnosis" placeholder="Type diagnosis..." spellcheck="false"></textarea>
+          <span id="noteGhost-diagnosis" class="note-ghost"></span>
+          <div id="noteDropdown-diagnosis" class="note-dropdown"></div>
+        </div>
+      </div>
+
+      <div class="note-card">
+        <label class="note-label" for="note-investigations">Investigations</label>
+        <div class="note-editor-wrapper">
+          <div class="note-history-count" id="noteHistory-investigations"></div>
+          <textarea id="note-investigations" class="clinical-note-area" data-section="investigations" placeholder="Type investigations..." spellcheck="false"></textarea>
+          <span id="noteGhost-investigations" class="note-ghost"></span>
+          <div id="noteDropdown-investigations" class="note-dropdown"></div>
+        </div>
+      </div>
+
+      <div class="note-card">
+        <label class="note-label" for="note-medications">Medications</label>
+        <div class="note-editor-wrapper">
+          <div class="note-history-count" id="noteHistory-medications"></div>
+          <textarea id="note-medications" class="clinical-note-area" data-section="medications" placeholder="Type medications..." spellcheck="false"></textarea>
+          <span id="noteGhost-medications" class="note-ghost"></span>
+          <div id="noteDropdown-medications" class="note-dropdown"></div>
+        </div>
+      </div>
+
+      <div class="note-card">
+        <label class="note-label" for="note-procedures">Procedures</label>
+        <div class="note-editor-wrapper">
+          <div class="note-history-count" id="noteHistory-procedures"></div>
+          <textarea id="note-procedures" class="clinical-note-area" data-section="procedures" placeholder="Type procedures..." spellcheck="false"></textarea>
+          <span id="noteGhost-procedures" class="note-ghost"></span>
+          <div id="noteDropdown-procedures" class="note-dropdown"></div>
+        </div>
+      </div>
+
+      <div class="note-card">
+        <label class="note-label" for="note-advice">Advice &amp; Follow-up</label>
+        <div class="note-editor-wrapper">
+          <div class="note-history-count" id="noteHistory-advice"></div>
+          <textarea id="note-advice" class="clinical-note-area" data-section="advice" placeholder="Type advice and follow-up..." spellcheck="false"></textarea>
+          <span id="noteGhost-advice" class="note-ghost"></span>
+          <div id="noteDropdown-advice" class="note-dropdown"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+  // ── CONFIG ─────────────────────────────────
+  const SOLR_URL = '';
+  const PAGE_SIZE = 15 ;
+
+  // ── STATE ──────────────────────────────────
+  let currentQuery    = '';
+  let currentPage     = 0;
+  let totalFound      = 0;
+  let abbrFilter      = 'all'; // all | only | hide
+  let debounceTimer   = null;
+  let activeController = null;
+  let latestRequestId = 0;
+  let activeSuggestionIndex = -1;
+  let currentSuggestions = [];
+  let currentGhostSuggestion = '';
+  const NOTE_TYPING_DEBOUNCE_MS = 180;
+
+  let patientContextParsedJsonCache = null;
+  let patientContextRawCache = '';
+
+  const searchInput = document.getElementById('searchInput');
+  const searchDropdown = document.getElementById('searchDropdown');
+  const ghostCompletion = document.getElementById('ghostCompletion');
+  const patientContextToggle = document.getElementById('patientContextToggle');
+  const patientContextBody = document.getElementById('patientContextBody');
+  const patientContextInput = document.getElementById('patientContextInput');
+  const patientContextStatus = document.getElementById('patientContextStatus');
+  const patientContextModeJsonBtn = document.getElementById('patientContextModeJson');
+  const patientContextModeTextBtn = document.getElementById('patientContextModeText');
+  const clearContextBtn = document.getElementById('clearContextBtn');
+  let patientContextMode = 'json';
+
+  const noteEditors = Array.from(document.querySelectorAll('.clinical-note-area')).map((textarea) => {
+    const section = textarea.dataset.section;
+    return {
+      section,
+      textarea,
+      wrapper: textarea.closest('.note-editor-wrapper'),
+      ghost: document.getElementById(`noteGhost-${section}`),
+      dropdown: document.getElementById(`noteDropdown-${section}`),
+      historyCount: document.getElementById(`noteHistory-${section}`),
+      debounceTimer: null,
+      activeController: null,
+      latestRequestId: 0,
+      suggestions: [],
+      activeSuggestionIndex: -1,
+      currentGhostSuggestion: '',
+      currentWord: '',
+      wordStart: -1,
+      wordEnd: -1,
+      contextBoostedCount: 0,
+    };
+  });
+
+  // ── INIT ───────────────────────────────────
+  checkSolrStatus();
+  searchInput.addEventListener('input', onSearchInput);
+  searchInput.addEventListener('keydown', onSearchKeyDown);
+  document.getElementById('filterSemantic').addEventListener('change', doSearch);
+  document.getElementById('filterSource').addEventListener('change', doSearch);
+  document.addEventListener('click', onDocumentClick);
+
+  patientContextToggle.addEventListener('click', togglePatientContext);
+  patientContextInput.addEventListener('input', updatePatientContextStatus);
+  // Validate structured JSON on blur so bad payloads are visible before request.
+  patientContextInput.addEventListener('blur', validatePatientContextJsonOnBlur);
+  patientContextModeJsonBtn.addEventListener('click', () => setPatientContextMode('json'));
+  patientContextModeTextBtn.addEventListener('click', () => setPatientContextMode('text'));
+  clearContextBtn.addEventListener('click', clearPatientContext);
+  updatePatientContextStatus();
+
+  noteEditors.forEach((editor) => {
+    editor.textarea.addEventListener('input', () => onNoteInput(editor));
+    editor.textarea.addEventListener('keydown', (e) => onNoteKeyDown(e, editor));
+    editor.textarea.addEventListener('click', () => onNoteCursorMove(editor));
+    editor.textarea.addEventListener('keyup', () => onNoteCursorMove(editor));
+    editor.textarea.addEventListener('scroll', () => onNoteScroll(editor));
+  });
+
+  async function checkSolrStatus() {
+    try {
+      const res = await fetch('/solr/ping');
+      const data = await res.json();
+      if (data.status === 'OK') {
+        document.getElementById('statusDot').style.background = 'var(--success)';
+        document.getElementById('statusText').textContent = 'Solr Connected';
+      }
+    } catch(e) {
+      document.getElementById('statusDot').style.background = 'var(--danger)';
+      document.getElementById('statusText').textContent = 'Solr Offline';
+    }
+  }
+
+  // ── SEARCH INPUT ───────────────────────────
+  function onSearchInput(e) {
+    clearTimeout(debounceTimer);
+    const val = e.target.value.trim();
+    activeSuggestionIndex = -1;
+    currentGhostSuggestion = '';
+    hideGhostCompletion();
+    if (!val) {
+      if (activeController) {
+        activeController.abort();
+        activeController = null;
+      }
+      resetResults();
+      return;
+    }
+    debounceTimer = setTimeout(() => {
+      currentPage = 0;
+      doSearch();
+    }, 300);
+  }
+
+  function onSearchKeyDown(e) {
+    if (e.key === 'Tab' && currentGhostSuggestion) {
+      e.preventDefault();
+      acceptGhostSuggestion();
+      return;
+    }
+
+    if (e.key === 'Escape') {
+      hideGhostCompletion();
+      hideDropdown();
+      return;
+    }
+
+    if (!currentSuggestions.length) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      activeSuggestionIndex = (activeSuggestionIndex + 1) % currentSuggestions.length;
+      updateDropdownActiveItem();
+      return;
+    }
+
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      activeSuggestionIndex = (activeSuggestionIndex - 1 + currentSuggestions.length) % currentSuggestions.length;
+      updateDropdownActiveItem();
+      return;
+    }
+
+    if (e.key === 'Enter' && activeSuggestionIndex >= 0) {
+      e.preventDefault();
+      selectSuggestion(activeSuggestionIndex);
+    }
+  }
+
+  function onDocumentClick(e) {
+    if (!searchDropdown.contains(e.target) && e.target !== searchInput) {
+      hideDropdown();
+    }
+    noteEditors.forEach((editor) => {
+      if (!editor.wrapper.contains(e.target)) {
+        hideNoteDropdown(editor);
+        hideNoteGhostCompletion(editor);
+      }
+    });
+  }
+
+  function togglePatientContext() {
+    const expanded = patientContextBody.style.display === 'block';
+    patientContextBody.style.display = expanded ? 'none' : 'block';
+    patientContextToggle.textContent = expanded ? 'Patient Context ▼' : 'Patient Context ▲';
+  }
+
+  function updatePatientContextStatus() {
+    const raw = patientContextInput.value.trim();
+    patientContextStatus.classList.remove('loaded', 'invalid');
+
+    if (!raw) {
+      patientContextStatus.textContent = 'No context loaded';
+      return;
+    }
+
+    if (patientContextMode === 'json') {
+      try {
+        JSON.parse(raw);
+        patientContextStatus.textContent = 'JSON context loaded ✓';
+        patientContextStatus.classList.add('loaded');
+      } catch (e) {
+        patientContextStatus.textContent = 'Invalid JSON ✗';
+        patientContextStatus.classList.add('invalid');
+      }
+      return;
+    }
+
+    patientContextStatus.textContent = 'Text context loaded ✓';
+    patientContextStatus.classList.add('loaded');
+  }
+
+  function validatePatientContextJsonOnBlur() {
+    if (patientContextMode !== 'json') return;
+    const raw = patientContextInput.value.trim();
+    if (!raw) {
+      updatePatientContextStatus();
+      return;
+    }
+
+    // On blur, surface explicit JSON validity feedback before request dispatch.
+    try {
+      JSON.parse(raw);
+      patientContextStatus.textContent = 'Valid JSON ✓';
+      patientContextStatus.classList.remove('invalid');
+      patientContextStatus.classList.add('loaded');
+    } catch (e) {
+      patientContextStatus.textContent = 'Invalid JSON ✗';
+      patientContextStatus.classList.remove('loaded');
+      patientContextStatus.classList.add('invalid');
+    }
+  }
+
+  function setPatientContextMode(mode) {
+    patientContextMode = mode;
+    const isJson = mode === 'json';
+    patientContextModeJsonBtn.classList.toggle('active', isJson);
+    patientContextModeTextBtn.classList.toggle('active', !isJson);
+    patientContextInput.placeholder = isJson
+      ? 'Paste structured patient JSON...'
+      : 'Paste patient clinical summary text...';
+    updatePatientContextStatus();
+  }
+
+  function clearPatientContext() {
+    patientContextInput.value = '';
+    patientContextRawCache = '';
+    patientContextParsedJsonCache = null;
+    updatePatientContextStatus();
+  }
+
+  function getCachedPatientContextJson(raw) {
+    if (patientContextRawCache === raw) {
+      return patientContextParsedJsonCache;
+    }
+
+    patientContextRawCache = raw;
+    try {
+      patientContextParsedJsonCache = JSON.parse(raw);
+    } catch (e) {
+      patientContextParsedJsonCache = null;
+    }
+    return patientContextParsedJsonCache;
+  }
+
+  function onNoteInput(editor) {
+    clearTimeout(editor.debounceTimer);
+    editor.activeSuggestionIndex = -1;
+    hideNoteGhostCompletion(editor);
+
+    const context = getCurrentWordContext(editor);
+    if (!context || !context.word) {
+      abortNoteController(editor);
+      hideNoteDropdown(editor);
+      return;
+    }
+
+    editor.currentWord = context.word;
+    editor.wordStart = context.start;
+    editor.wordEnd = context.end;
+
+    editor.debounceTimer = setTimeout(() => {
+      searchNoteWord(editor);
+    }, NOTE_TYPING_DEBOUNCE_MS);
+  }
+
+  function onNoteCursorMove(editor) {
+    if (!editor.suggestions.length || !editor.currentWord) {
+      hideNoteGhostCompletion(editor);
+      return;
+    }
+    positionNoteGhost(editor);
+    positionNoteDropdown(editor);
+  }
+
+  function onNoteScroll(editor) {
+    if (editor.ghost.style.display === 'block') {
+      positionNoteGhost(editor);
+    }
+    if (editor.dropdown.style.display === 'block') {
+      positionNoteDropdown(editor);
+    }
+  }
+
+  function onNoteKeyDown(e, editor) {
+    if (e.key === 'Tab' && editor.currentGhostSuggestion) {
+      e.preventDefault();
+      acceptNoteGhostSuggestion(editor);
+      return;
+    }
+
+    if (e.key === 'Escape') {
+      hideNoteDropdown(editor);
+      hideNoteGhostCompletion(editor);
+      return;
+    }
+
+    if (!editor.suggestions.length) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      editor.activeSuggestionIndex = (editor.activeSuggestionIndex + 1) % editor.suggestions.length;
+      updateNoteDropdownActiveItem(editor);
+      return;
+    }
+
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      editor.activeSuggestionIndex = (editor.activeSuggestionIndex - 1 + editor.suggestions.length) % editor.suggestions.length;
+      updateNoteDropdownActiveItem(editor);
+      return;
+    }
+
+    if (e.key === 'Enter' && editor.activeSuggestionIndex >= 0) {
+      e.preventDefault();
+      selectNoteSuggestion(editor.activeSuggestionIndex, editor);
+    }
+  }
+
+  function toggleAbbreviations() {
+    const btn = document.getElementById('toggleAbbr');
+    if (abbrFilter === 'all') {
+      abbrFilter = 'hide';
+      btn.textContent = 'Hide Abbreviations';
+      btn.classList.add('active');
+    } else if (abbrFilter === 'hide') {
+      abbrFilter = 'only';
+      btn.textContent = 'Abbrev. Only';
+    } else {
+      abbrFilter = 'all';
+      btn.textContent = 'Show All';
+      btn.classList.remove('active');
+    }
+    currentPage = 0;
+    doSearch();
+  }
+
+  function changePage(dir) {
+    currentPage += dir;
+    doSearch();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // ── MAIN SEARCH ────────────────────────────
+  async function doSearch() {
+    const query = searchInput.value.trim();
+    if (!query) { resetResults(); return; }
+    const normalizedQuery = query.replace(/\s+/g, ' ').trim();
+    const requestId = ++latestRequestId;
+
+    if (activeController) {
+      activeController.abort();
+    }
+    activeController = new AbortController();
+
+    currentQuery = normalizedQuery;
+    showLoading();
+
+    // Build params
+    const params = new URLSearchParams();
+    params.set('q',    normalizedQuery);
+    params.set('rows', PAGE_SIZE);
+    params.set('start', currentPage * PAGE_SIZE);
+    params.set('wt',   'json');
+    params.set('fl',   'id,term,tty,semantic_type,source,code,concept_id,is_abbreviation');
+
+    // Semantic type filter
+    const semType = document.getElementById('filterSemantic').value;
+    if (semType) {
+      params.append('fq', `semantic_type:"${semType}"`);
+    }
+
+    // Source filter
+    const source = document.getElementById('filterSource').value;
+    if (source) {
+      params.append('fq', `source:${source}`);
+    }
+
+    // Abbreviation filter
+    if (abbrFilter === 'hide') {
+      params.append('fq', 'is_abbreviation:false');
+    } else if (abbrFilter === 'only') {
+      params.append('fq', 'is_abbreviation:true');
+    }
+
+    
+    const url = `/solr/select?${params.toString()}`;
+    const start = performance.now();
+
+    try {
+      const res  = await fetch(url, { signal: activeController.signal });
+      const data = await res.json();
+
+      if (requestId !== latestRequestId) {
+        return;
+      }
+
+      const elapsed = Math.round(performance.now() - start);
+
+      totalFound = data.response.numFound;
+      const docs = (data.response.docs || []).slice(0, 15);
+
+      document.getElementById('statSpeed').textContent = `${elapsed}ms`;
+      renderResults(docs, elapsed, normalizedQuery);
+      renderPagination();
+    } catch(e) {
+      if (e.name === 'AbortError') {
+        return;
+      }
+      if (requestId !== latestRequestId) {
+        return;
+      }
+      showError();
+    } finally {
+      if (requestId === latestRequestId) {
+        activeController = null;
+      }
+    }
+  }
+
+  async function searchNoteWord(editor) {
+    const context = getCurrentWordContext(editor);
+    if (!context || !context.word) {
+      hideNoteDropdown(editor);
+      hideNoteGhostCompletion(editor);
+      return;
+    }
+
+    editor.currentWord = context.word;
+    editor.wordStart = context.start;
+    editor.wordEnd = context.end;
+
+    const requestId = ++editor.latestRequestId;
+    abortNoteController(editor);
+    editor.activeController = new AbortController();
+
+    const contextValue = patientContextInput.value.trim();
+    const hasContext = !!contextValue;
+
+    try {
+      let res;
+
+      if (hasContext) {
+        // Use POST with JSON body to avoid URL length limits with large patient JSON
+        const body = {
+          q: editor.currentWord,
+          section: editor.section,
+          rows: 15,
+        };
+        if (patientContextMode === 'json') {
+          body.patient_context_json = getCachedPatientContextJson(contextValue);
+        } else {
+          body.patient_context = contextValue;
+        }
+        res = await fetch('/api/note/complete/context', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+          signal: editor.activeController.signal,
+        });
+      } else {
+        // No context — use GET to /api/note/complete as before
+        const params = new URLSearchParams();
+        params.set('q', editor.currentWord);
+        params.set('section', editor.section);
+        params.set('rows', '15');
+        res = await fetch(`/api/note/complete?${params.toString()}`, {
+          signal: editor.activeController.signal,
+        });
+      }
+
+      const data = await res.json();
+
+      if (requestId !== editor.latestRequestId) {
+        return;
+      }
+
+      const results = Array.isArray(data.results) ? data.results : [];
+      editor.suggestions = results.slice(0, 15).map((item) => ({
+        term: item.term || '',
+        fromPatientHistory: !!item.from_patient_history,
+      })).filter((item) => item.term);
+      editor.contextBoostedCount = Number(data.context_boosted_count || 0);
+      editor.activeSuggestionIndex = -1;
+
+      renderNoteDropdown(editor);
+      updateNoteGhostCompletion(editor);
+    } catch (e) {
+      if (e.name === 'AbortError') {
+        return;
+      }
+      if (requestId !== editor.latestRequestId) {
+        return;
+      }
+      hideNoteDropdown(editor);
+      hideNoteGhostCompletion(editor);
+    } finally {
+      if (requestId === editor.latestRequestId) {
+        editor.activeController = null;
+      }
+    }
+  }
+
+  // ── RENDER ─────────────────────────────────
+  function renderResults(docs, elapsed, query) {
+    hideLoading();
+
+    const countEl = document.getElementById('resultsCount');
+    const timeEl  = document.getElementById('resultsTime');
+
+    countEl.innerHTML = totalFound > 0
+      ? `<strong>${totalFound.toLocaleString()}</strong> results found`
+      : `No results for "<strong>${query}</strong>"`;
+
+    timeEl.textContent = `${elapsed}ms`;
+
+    if (docs.length === 0) {
+      currentSuggestions = [];
+      activeSuggestionIndex = -1;
+      hideDropdown();
+      hideGhostCompletion();
+      return;
+    }
+
+    currentSuggestions = docs.map((doc) => getVal(doc, 'term')).filter(Boolean);
+    activeSuggestionIndex = -1;
+    renderDropdown(query);
+    updateGhostCompletion(query);
+  }
+
+  function renderDropdown(query) {
+    if (!currentSuggestions.length) {
+      hideDropdown();
+      return;
+    }
+
+    searchDropdown.innerHTML = currentSuggestions.map((term, index) => {
+      const highlighted = highlightTerm(term, query);
+      return `<button type="button" class="dropdown-item" data-index="${index}">${highlighted}</button>`;
+    }).join('');
+
+    searchDropdown.querySelectorAll('.dropdown-item').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const idx = Number(btn.getAttribute('data-index'));
+        selectSuggestion(idx);
+      });
+    });
+
+    searchDropdown.style.display = 'block';
+  }
+
+  function hideDropdown() {
+    searchDropdown.style.display = 'none';
+    searchDropdown.innerHTML = '';
+    currentSuggestions = [];
+    activeSuggestionIndex = -1;
+  }
+
+  function updateDropdownActiveItem() {
+    const items = searchDropdown.querySelectorAll('.dropdown-item');
+    items.forEach((item, idx) => {
+      item.classList.toggle('active', idx === activeSuggestionIndex);
+      if (idx === activeSuggestionIndex) {
+        item.scrollIntoView({ block: 'nearest' });
+      }
+    });
+  }
+
+  function selectSuggestion(index) {
+    const selected = currentSuggestions[index];
+    if (!selected) return;
+    searchInput.value = selected;
+    hideGhostCompletion();
+    hideDropdown();
+    currentPage = 0;
+    doSearch();
+  }
+
+  function updateGhostCompletion(query) {
+    if (!query || !currentSuggestions.length) {
+      hideGhostCompletion();
+      return;
+    }
+
+    const top = currentSuggestions[0] || '';
+    const q = query;
+    if (!top.toLowerCase().startsWith(q.toLowerCase()) || top.length <= q.length) {
+      hideGhostCompletion();
+      return;
+    }
+
+    currentGhostSuggestion = top;
+    const completion = top.slice(q.length);
+    if (!completion) {
+      hideGhostCompletion();
+      return;
+    }
+
+    const inputStyles = window.getComputedStyle(searchInput);
+    const leftBase = parseFloat(inputStyles.paddingLeft) || 56;
+    const typedWidth = measureTextWidth(q, inputStyles);
+
+    ghostCompletion.textContent = completion;
+    ghostCompletion.style.left = `${leftBase + typedWidth}px`;
+    ghostCompletion.style.display = 'block';
+  }
+
+  function hideGhostCompletion() {
+    currentGhostSuggestion = '';
+    ghostCompletion.style.display = 'none';
+    ghostCompletion.textContent = '';
+  }
+
+  function acceptGhostSuggestion() {
+    if (!currentGhostSuggestion) return;
+    searchInput.value = currentGhostSuggestion;
+    hideGhostCompletion();
+    currentPage = 0;
+    doSearch();
+  }
+
+  function measureTextWidth(text, styles) {
+    const canvas = measureTextWidth.canvas || (measureTextWidth.canvas = document.createElement('canvas'));
+    const ctx = canvas.getContext('2d');
+    const font = `${styles.fontStyle} ${styles.fontVariant} ${styles.fontWeight} ${styles.fontSize} / ${styles.lineHeight} ${styles.fontFamily}`;
+    ctx.font = font;
+    return ctx.measureText(text).width;
+  }
+
+  function renderPagination() {
+    document.getElementById('pagination').style.display = 'none';
+  }
+
+  function renderNoteDropdown(editor) {
+    if (!editor.suggestions.length || !editor.currentWord) {
+      hideNoteDropdown(editor);
+      return;
+    }
+
+    if (editor.contextBoostedCount > 0) {
+      editor.historyCount.style.display = 'block';
+      editor.historyCount.textContent = `${editor.contextBoostedCount} from patient history`;
+    } else {
+      editor.historyCount.style.display = 'none';
+      editor.historyCount.textContent = '';
+    }
+
+    editor.dropdown.innerHTML = editor.suggestions.map((item, index) => {
+      const highlighted = highlightTerm(item.term, editor.currentWord);
+      const star = item.fromPatientHistory ? '<span class="note-history-star">★</span>' : '';
+      return `<button type="button" class="dropdown-item" data-note-index="${index}">${star}${highlighted}</button>`;
+    }).join('');
+
+    editor.dropdown.querySelectorAll('.dropdown-item').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const idx = Number(btn.getAttribute('data-note-index'));
+        selectNoteSuggestion(idx, editor);
+      });
+    });
+
+    positionNoteDropdown(editor);
+    editor.dropdown.style.display = 'block';
+  }
+
+  function hideNoteDropdown(editor) {
+    editor.dropdown.style.display = 'none';
+    editor.dropdown.innerHTML = '';
+    editor.suggestions = [];
+    editor.activeSuggestionIndex = -1;
+    editor.historyCount.style.display = 'none';
+    editor.historyCount.textContent = '';
+  }
+
+  function updateNoteDropdownActiveItem(editor) {
+    const items = editor.dropdown.querySelectorAll('.dropdown-item');
+    items.forEach((item, idx) => {
+      item.classList.toggle('active', idx === editor.activeSuggestionIndex);
+      if (idx === editor.activeSuggestionIndex) {
+        item.scrollIntoView({ block: 'nearest' });
+      }
+    });
+  }
+
+  function updateNoteGhostCompletion(editor) {
+    if (!editor.currentWord || !editor.suggestions.length) {
+      hideNoteGhostCompletion(editor);
+      return;
+    }
+
+    const top = editor.suggestions[0].term || '';
+    if (!top.toLowerCase().startsWith(editor.currentWord.toLowerCase()) || top.length <= editor.currentWord.length) {
+      hideNoteGhostCompletion(editor);
+      return;
+    }
+
+    const suffix = top.slice(editor.currentWord.length);
+    if (!suffix) {
+      hideNoteGhostCompletion(editor);
+      return;
+    }
+
+    editor.currentGhostSuggestion = top;
+    editor.ghost.textContent = suffix;
+    positionNoteGhost(editor);
+    editor.ghost.style.display = 'block';
+  }
+
+  function hideNoteGhostCompletion(editor) {
+    editor.currentGhostSuggestion = '';
+    editor.ghost.style.display = 'none';
+    editor.ghost.textContent = '';
+  }
+
+  function acceptNoteGhostSuggestion(editor) {
+    if (!editor.currentGhostSuggestion) return;
+    replaceCurrentWordInNote(editor.currentGhostSuggestion, editor);
+  }
+
+  function selectNoteSuggestion(index, editor) {
+    const selected = editor.suggestions[index];
+    if (!selected || !selected.term) return;
+    replaceCurrentWordInNote(selected.term, editor);
+  }
+
+  function replaceCurrentWordInNote(replacement, editor) {
+    const text = editor.textarea.value;
+    const context = getCurrentWordContext(editor);
+    if (!context) return;
+
+    const before = text.slice(0, context.start);
+    const after = text.slice(context.end);
+    editor.textarea.value = `${before}${replacement}${after}`;
+
+    const newCursor = context.start + replacement.length;
+    editor.textarea.setSelectionRange(newCursor, newCursor);
+    editor.textarea.focus();
+
+    hideNoteGhostCompletion(editor);
+    hideNoteDropdown(editor);
+    editor.currentWord = replacement;
+    editor.wordStart = context.start;
+    editor.wordEnd = context.start + replacement.length;
+  }
+
+  function getCurrentWordContext(editor) {
+    const text = editor.textarea.value;
+    const cursor = editor.textarea.selectionStart;
+    if (cursor == null) return null;
+
+    const left = text.slice(0, cursor);
+    const right = text.slice(cursor);
+    const leftMatch = left.match(/[A-Za-z0-9'_-]+$/);
+    if (!leftMatch) return null;
+
+    const word = leftMatch[0];
+    const start = cursor - word.length;
+    const rightMatch = right.match(/^[A-Za-z0-9'_-]*/);
+    const rightPart = rightMatch ? rightMatch[0] : '';
+    const end = cursor + rightPart.length;
+
+    return { word, start, end, cursor };
+  }
+
+  function positionNoteGhost(editor) {
+    if (!editor.currentGhostSuggestion || !editor.currentWord) {
+      hideNoteGhostCompletion(editor);
+      return;
+    }
+
+    const context = getCurrentWordContext(editor);
+    if (!context) {
+      hideNoteGhostCompletion(editor);
+      return;
+    }
+
+    const caret = getTextareaCaretCoordinates(editor.textarea, context.cursor);
+    const wrapperRect = editor.wrapper.getBoundingClientRect();
+    const textareaRect = editor.textarea.getBoundingClientRect();
+
+    editor.ghost.style.left = `${textareaRect.left - wrapperRect.left + caret.left}px`;
+    editor.ghost.style.top = `${textareaRect.top - wrapperRect.top + caret.top}px`;
+  }
+
+  function positionNoteDropdown(editor) {
+    const context = getCurrentWordContext(editor);
+    if (!context) {
+      hideNoteDropdown(editor);
+      return;
+    }
+
+    const caret = getTextareaCaretCoordinates(editor.textarea, context.cursor);
+    const wrapperRect = editor.wrapper.getBoundingClientRect();
+    const textareaRect = editor.textarea.getBoundingClientRect();
+    const lineHeight = parseFloat(getComputedStyle(editor.textarea).lineHeight) || 24;
+
+    const top = textareaRect.top - wrapperRect.top + caret.top + lineHeight + 4;
+    const left = textareaRect.left - wrapperRect.left + caret.left;
+    editor.dropdown.style.top = `${top}px`;
+    editor.dropdown.style.left = `${left}px`;
+  }
+
+  function abortNoteController(editor) {
+    if (editor.activeController) {
+      editor.activeController.abort();
+      editor.activeController = null;
+    }
+  }
+
+  function getTextareaCaretCoordinates(textarea, position) {
+    const div = getTextareaCaretMirrorDiv();
+    const style = window.getComputedStyle(textarea);
+    const properties = [
+      'boxSizing', 'width', 'height', 'overflowX', 'overflowY',
+      'borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth',
+      'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
+      'fontStyle', 'fontVariant', 'fontWeight', 'fontStretch', 'fontSize',
+      'lineHeight', 'fontFamily', 'textAlign', 'textTransform',
+      'textIndent', 'textDecoration', 'letterSpacing', 'wordSpacing'
+    ];
+
+    properties.forEach((prop) => {
+      div.style[prop] = style[prop];
+    });
+
+    div.textContent = textarea.value.slice(0, position);
+    const span = getTextareaCaretMirrorSpan(div);
+    span.textContent = textarea.value.slice(position) || '.';
+
+    const left = span.offsetLeft - textarea.scrollLeft;
+    const top = span.offsetTop - textarea.scrollTop;
+    return { left, top };
+  }
+
+  function getTextareaCaretMirrorDiv() {
+    if (!getTextareaCaretMirrorDiv.div) {
+      const div = document.createElement('div');
+      div.style.position = 'absolute';
+      div.style.visibility = 'hidden';
+      div.style.whiteSpace = 'pre-wrap';
+      div.style.wordWrap = 'break-word';
+      div.style.top = '-9999px';
+      div.style.left = '-9999px';
+      document.body.appendChild(div);
+      getTextareaCaretMirrorDiv.div = div;
+    }
+    return getTextareaCaretMirrorDiv.div;
+  }
+
+  function getTextareaCaretMirrorSpan(div) {
+    if (!getTextareaCaretMirrorSpan.span) {
+      getTextareaCaretMirrorSpan.span = document.createElement('span');
+    }
+    const span = getTextareaCaretMirrorSpan.span;
+    if (span.parentNode !== div) {
+      div.appendChild(span);
+    }
+    return span;
+  }
+
+  // ── HELPERS ────────────────────────────────
+  function getVal(doc, field) {
+    const v = doc[field];
+    if (Array.isArray(v)) return v[0] || '';
+    return v || '';
+  }
+
+  function highlightTerm(term, query) {
+    if (!query || !term) return escapeHtml(term);
+    const escaped  = escapeHtml(term);
+    const q        = escapeHtml(query);
+    const regex    = new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+    return escaped.replace(regex, '<mark>$1</mark>');
+  }
+
+  function escapeHtml(text) {
+    return String(text)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function showLoading() {
+    document.getElementById('loadingBar').style.display = 'block';
+    document.getElementById('resultsCount').textContent = 'Searching...';
+    document.getElementById('resultsTime').textContent  = '';
+  }
+
+  function hideLoading() {
+    document.getElementById('loadingBar').style.display = 'none';
+  }
+
+  function resetResults() {
+    hideLoading();
+    document.getElementById('resultsCount').textContent = '';
+    document.getElementById('resultsTime').textContent  = '';
+    document.getElementById('pagination').style.display = 'none';
+    hideDropdown();
+    hideGhostCompletion();
+    document.getElementById('results').innerHTML = `
+      <div class="state-message">
+        <span class="icon">⌨️</span>
+        <h3>Start typing to search</h3>
+        <p>Results appear instantly as you type</p>
+      </div>`;
+  }
+
+  function showError() {
+    hideLoading();
+    hideDropdown();
+    hideGhostCompletion();
+    document.getElementById('results').innerHTML = `
+      <div class="state-message">
+        <span class="icon">⚠️</span>
+        <h3>Connection Error</h3>
+        <p>Could not reach Solr at ${SOLR_URL}. Make sure Solr is running.</p>
+      </div>`;
+  }
+</script>
+</body>
+</html>

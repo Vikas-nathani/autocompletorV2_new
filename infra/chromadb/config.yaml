@@ -1,0 +1,2 @@
+persist_directory: /chroma_db
+anonymized_telemetry: false

@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Solr managed-schema for the `terms` core.
+
+  Copy this file into your Solr core's conf/ directory, or use the Schema API
+  to apply fields and field types one-by-one against a running core.
+
+  Autocomplete design
+  -------------------
+  term_suggest uses EdgeNGramFilterFactory at index time:
+    "hypertension" → "h", "hy", "hyp", "hype", …, "hypertension"
+
+  At query time only KeywordTokenizer + LowerCaseFilter is applied, so the
+  user's prefix ("hypert") matches the stored n-gram exactly — no wildcard
+  query needed. This keeps Solr's filter cache effective at millions of terms.
+
+  Ranking
+  -------
+  The `tty` and `is_abbreviation` fields are stored/indexed as-is so the
+  Python client can apply boost queries (bq) per request.
+-->
+<schema name="medical_terms" version="1.6">
+
+  <!-- ================================================================
+       Unique key
+       ================================================================ -->
+  <uniqueKey>id</uniqueKey>
+
+  <!-- ================================================================
+       Field types
+       ================================================================ -->
+
+  <fieldType name="string"  class="solr.StrField"        sortMissingLast="true"/>
+  <fieldType name="plong"   class="solr.LongPointField"  docValues="true"/>
+  <fieldType name="boolean" class="solr.BoolField"       sortMissingLast="true"/>
+
+  <!--
+    text_autocomplete
+    -----------------
+    Index analyzer : KeywordTokenizer (treat whole value as one token)
+                     → LowerCaseFilter
+                     → EdgeNGramFilter  (minGram=1, maxGram=20)
+
+    Query analyzer : KeywordTokenizer → LowerCaseFilter  (no n-grams)
+
+    minGramSize=1  allows single-character lookups.
+    maxGramSize=20 covers the vast majority of medical terms.
+    Raise maxGramSize if you have longer terms in your dataset.
+  -->
+  <fieldType name="text_autocomplete" class="solr.TextField" positionIncrementGap="100">
+    <analyzer type="index">
+      <tokenizer class="solr.KeywordTokenizerFactory"/>
+      <filter class="solr.LowerCaseFilterFactory"/>
+      <filter class="solr.EdgeNGramFilterFactory" minGramSize="1" maxGramSize="25"/>
+    </analyzer>
+    <analyzer type="query">
+      <tokenizer class="solr.KeywordTokenizerFactory"/>
+      <filter class="solr.LowerCaseFilterFactory"/>
+    </analyzer>
+  </fieldType>
+
+  <!-- ================================================================
+       Fields (mapped 1-to-1 from terms_master columns)
+       ================================================================ -->
+
+  <!-- Primary key — stored as long, but sent from Python as a string -->
+  <field name="id"              type="plong"   indexed="true"  stored="true"  required="true"/>
+
+  <!-- Display value — not indexed; returned in search results only -->
+  <field name="term"            type="string"  indexed="false" stored="true"/>
+
+  <!-- Exact-match / filter field -->
+  <field name="term_lower"      type="string"  indexed="true"  stored="true"/>
+
+  <!-- Ranking signal — indexed so boost queries (bq) can filter on it -->
+  <field name="is_abbreviation" type="boolean" indexed="true"  stored="true"/>
+
+  <!-- Numeric length used by bf=recip(field(term_length),…) to reward short terms -->
+  <field name="term_length"     type="plong"   indexed="false" stored="false" docValues="true"/>
+  <field name="tty"             type="string"  indexed="true"  stored="true"/>
+
+  <!--
+    term_suggest
+    ------------
+    EdgeNGram copy of term_lower — the field targeted by autocomplete queries.
+    Not stored (saves disk/RAM); `term` is the stored display value.
+  -->
+  <field name="term_suggest" type="text_autocomplete" indexed="true" stored="false"/>
+
+  <!-- ================================================================
+       Copy fields
+       ================================================================ -->
+
+  <!-- Automatically populate term_suggest from term_lower at index time -->
+  <copyField source="term_lower" dest="term_suggest"/>
+
+</schema>

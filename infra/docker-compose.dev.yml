@@ -1,0 +1,51 @@
+version: "3.9"
+# Development overrides
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f infra/docker-compose.dev.yml up
+#
+# Key differences from base:
+#   - restart: "no" on every service (fail fast for easier debugging)
+#   - Redis persistence disabled (faster dev cycles)
+#   - Solr dev tuning
+
+services:
+  knowledge-service:
+    restart: "no"
+    environment:
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+
+  solr:
+    restart: "no"
+    environment:
+      - SOLR_OPTS=-Dsolr.disable.shardsWhiteList=true
+
+  redis:
+    restart: "no"
+    # Disable persistence in dev — faster startup, no stale cache across resets
+    command: redis-server --save "" --loglevel verbose
+
+  api-gateway:
+    restart: "no"
+
+  ingestion-service:
+    restart: "no"
+
+  chunking-service:
+    restart: "no"
+
+  retrieval-service:
+    restart: "no"
+
+  autocomplete-service:
+    restart: "no"
+
+  visit-service:
+    restart: "no"
+
+  document-service:
+    restart: "no"
+
+  audit-service:
+    restart: "no"
