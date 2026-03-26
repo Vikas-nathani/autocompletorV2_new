@@ -473,8 +473,8 @@ async def note_complete_context_post_endpoint(body: NoteCompleteContextRequest):
     response_model=NoteCompleteContextResponse,
     summary="Context-aware medical term completion from uploaded file",
     description=(
-        "Accepts multipart/form-data and reads patient context from an uploaded "
-        "file (.json for structured context, otherwise plain text)."
+        "Accepts multipart/form-data and optionally reads patient context from an "
+        "uploaded file (.json for structured context, otherwise plain text)."
     ),
 )
 async def note_complete_context_file_endpoint(
@@ -484,11 +484,80 @@ async def note_complete_context_file_endpoint(
     fuzzy: bool = Form(True, description="Enable spell correction fallback for zero results"),
     source: str | None = Form(None, description="Filter to specific source vocabulary"),
     tty: str | None = Form(None, description="Comma-separated list of TTY codes to filter"),
-    patient_context_file: UploadFile = File(..., description="Patient context file (.json or text)"),
+    patient_context_file: UploadFile | str | None = File(None, description="Optional patient context file (.json or text)"),
 ):
+    start_ts = time.perf_counter()
+
+    if section not in VALID_SECTIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid section '{section}'. Valid sections: {', '.join(VALID_SECTIONS)}",
+        )
+
+    try:
+        validated = NoteCompleteRequest(
+            q=q,
+            section=section,
+            rows=rows,
+            fuzzy=fuzzy,
+            source=source,
+            tty=tty,
+        )
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail={"message": "Invalid request parameters", "errors": exc.errors()})
+
+    async def _fallback_without_context() -> NoteCompleteContextResponse:
+        try:
+            docs, solr_hits, spell_corrected = await note_complete(
+                q=validated.q,
+                section=validated.section,
+                rows=validated.rows,
+                fuzzy=validated.fuzzy,
+                source=validated.source,
+                tty=validated.tty,
+            )
+        except httpx.HTTPError as exc:
+            raise HTTPException(status_code=503, detail=f"Solr service unavailable: {exc}")
+        except Exception as exc:  # pragma: no cover - safety net for API resilience
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "error": "note_completion_unavailable",
+                    "message": "Failed to complete note suggestions",
+                    "detail": str(exc),
+                },
+            )
+
+        results, boosted_count = _merge_context_and_umls_results(
+            docs=docs,
+            context_matches=[],
+            rows=validated.rows,
+        )
+        response_time_ms = (time.perf_counter() - start_ts) * 1000.0
+        return NoteCompleteContextResponse(
+            query=validated.q,
+            section=validated.section,
+            semantic_types_applied=SECTION_SEMANTIC_TYPES[validated.section],
+            spell_corrected=spell_corrected,
+            total=len(results),
+            results=results,
+            response_time_ms=response_time_ms,
+            solr_hits=solr_hits,
+            context_boosted_count=boosted_count,
+        )
+
+    if patient_context_file is None:
+        return await _fallback_without_context()
+
+    if isinstance(patient_context_file, str):
+        if not patient_context_file.strip():
+            return await _fallback_without_context()
+        raise HTTPException(status_code=400, detail="patient_context_file must be a file upload")
+
     filename = (patient_context_file.filename or "").strip()
     if not filename:
-        raise HTTPException(status_code=400, detail="patient_context_file filename is required")
+        await patient_context_file.close()
+        return await _fallback_without_context()
 
     try:
         raw_bytes = await patient_context_file.read()
@@ -496,7 +565,7 @@ async def note_complete_context_file_endpoint(
         await patient_context_file.close()
 
     if not raw_bytes:
-        raise HTTPException(status_code=400, detail="patient_context_file is empty")
+        return await _fallback_without_context()
 
     content_type = (patient_context_file.content_type or "").lower()
     lower_name = filename.lower()
