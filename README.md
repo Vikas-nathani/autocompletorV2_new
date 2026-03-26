@@ -1,21 +1,142 @@
-# Clinical Copilot Engine (Backend)
+# Clinical Copilot Engine
 
-Production-oriented backend refactor for Solr-powered clinical autocomplete.
+Clinical Copilot Engine is a FastAPI-based backend for clinical note autocomplete. It uses Apache Solr as the search index and applies medical-domain ranking and filtering rules to return relevant suggestions while a clinician is typing.
 
-## Structure
+The service is designed for:
 
-- `app/` runtime application package
-  - `app/app.py` FastAPI entrypoint (filename unchanged)
-  - `app/api/` API routes
-  - `app/core/` shared config
-  - `app/services/` note completion + context parsing services
-  - `app/models/` Pydantic models
-- `scripts/` ETL and maintenance scripts
-- `tests/` test suite
-- `infra/` infra configuration
-- `data/` runtime data artifacts (`*.json`, `*.log`)
+- Section-aware term suggestions (for example diagnosis vs medications)
+- Context-aware suggestions boosted from patient history
+- Medical terminology normalization and abbreviation support
+- High-speed retrieval from a Solr index with deterministic filtering
 
-## Run
+## Why This Project Exists
+
+In clinical documentation workflows, free typing can be slow and inconsistent. This engine helps by:
+
+- Reducing typing effort with autocomplete
+- Improving terminology consistency using controlled vocabularies
+- Surfacing context-relevant terms for each note section
+- Prioritizing better candidates through ranking signals (TTY/source priority, semantic constraints, deduplication)
+
+## Core Capabilities
+
+- Fast autocomplete over medical terms indexed in Solr
+- Semantic filtering by note section (`chief_complaint`, `diagnosis`, `investigations`, `medications`, `procedures`, `advice`)
+- Query normalization and abbreviation expansion (for example `mi` -> `myocardial infarction`)
+- Fuzzy fallback when exact/prefix matches are empty
+- Context boosting from parsed patient summary text or JSON
+- API-first design with typed request/response models (Pydantic)
+
+## High-Level Architecture
+
+```text
+Client/UI
+  |
+  v
+FastAPI (backend.app + backend.api.router)
+  |
+  |-- Validation layer (backend.models.models)
+  |-- Section rules (backend.services.section_config)
+  |-- Context parser (backend.services.context_parser)
+  |-- Search service (backend.services.search)
+  |
+  v
+Apache Solr (umls_core)
+```
+
+### Request Flow (Section-Aware Completion)
+
+1. Client calls `/api/note/complete` with `q`, `section`, and optional tuning params.
+2. Request is validated using Pydantic models.
+3. Section-specific semantic filter query is generated.
+4. Search service builds Solr query + filtering constraints.
+5. Solr docs are post-processed (filter, deduplicate, rerank).
+6. API returns structured ranked suggestions.
+
+### Request Flow (Context-Aware Completion)
+
+1. Client sends text/JSON patient context to `/api/note/complete/context` (GET/POST/file upload variants).
+2. Context parser extracts relevant history terms.
+3. Base UMLS suggestions are fetched from Solr.
+4. Matching patient-history terms are boosted to the top.
+5. Response includes `from_patient_history` flags and `context_boosted_count`.
+
+## Tech Stack
+
+- Language: Python 3.10+
+- API framework: FastAPI
+- ASGI server: Uvicorn
+- HTTP client: httpx
+- Validation/models: Pydantic v2
+- Search engine: Apache Solr 9 (`umls_core`)
+- Containerization: Docker + Docker Compose
+- Testing: pytest + httpx ASGI transport
+
+Key dependencies are listed in `requirements.txt`.
+
+## Project Structure
+
+```text
+backend/
+  app.py                  # Main FastAPI app, Solr integration, ranking/filter logic
+  api/router.py           # Section-aware + context-aware note APIs
+  core/config.py          # Environment-driven runtime configuration
+  models/models.py        # Request/response models and validation
+  services/search.py      # Section-aware query pipeline
+  services/context_parser.py
+                          # Parser for plain-text/JSON patient context
+  services/section_config.py
+                          # Section -> semantic type mapping and filters
+
+tests/                    # API/service behavior tests
+scripts/                  # Solr data preparation and index utility scripts
+infra/                    # Dev compose overrides and infra assets
+data/                     # Data artifacts used by scripts/runtime
+clinical_copilot_ui.html  # Basic UI served at `/`
+```
+
+## API Endpoints
+
+### General Endpoints
+
+- `GET /` -> serves `clinical_copilot_ui.html`
+- `GET /health` -> API/Solr health snapshot
+- `GET /solr/ping` -> Solr ping passthrough
+- `GET /solr/select` -> Solr select wrapper with autocomplete-oriented rewrite/filtering
+- `GET /search` -> generic search endpoint with optional filters
+- `GET /stats` -> index stats/facets
+
+### Note Completion Endpoints
+
+- `GET /api/note/complete`
+  - Section-aware note autocomplete
+- `GET /api/note/complete/context`
+  - Context-aware autocomplete via query params
+- `POST /api/note/complete/context`
+  - Context-aware autocomplete via JSON body
+- `POST /api/note/complete/context/file`
+  - Context-aware autocomplete via multipart file upload (`.json` or plain text)
+- `GET /api/note/sections`
+  - Lists valid sections and their semantic type filters
+
+## Configuration
+
+Configuration is environment-driven.
+
+Important variables:
+
+- `SOLR_URL` (default: `http://localhost:8983/solr/umls_core`)
+- `NOTE_API_DEFAULT_ROWS` (default: `15`)
+- `NOTE_API_MAX_ROWS` (default: `50`)
+- `NOTE_API_VERSION` (default: `1.0.0`)
+- `NOTE_API_VALID_SECTIONS`
+  - Comma-separated override for valid sections.
+
+`docker-compose.yml` expects a `.env` file for backend environment injection.
+
+## How To Run
+
+### Option 1: Local Python Runtime
 
 ```bash
 python3 -m venv .venv
@@ -24,19 +145,86 @@ pip install -r requirements.txt
 uvicorn backend.app:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Compatibility import for existing code/tests is preserved:
+Prerequisite: a running Solr instance with `umls_core` available.
 
-```python
-from backend import app
+### Option 2: Docker Compose
+
+```bash
+docker compose up --build
 ```
 
-## Test
+This starts:
+
+- `solr` on `8983`
+- `backend` on `8000`
+
+Then open:
+
+- API docs: `http://localhost:8000/docs`
+- UI page: `http://localhost:8000/`
+
+### Development Override (Optional)
+
+The repository includes `infra/docker-compose.dev.yml` with dev-oriented overrides. It is intended as an override layer and may reference services not defined in the base compose file.
+
+```bash
+docker compose -f docker-compose.yml -f infra/docker-compose.dev.yml up --build
+```
+
+## Example API Usage
+
+### Section-Aware Completion
+
+```bash
+curl "http://localhost:8000/api/note/complete?q=diab&section=diagnosis&rows=10"
+```
+
+### Context-Aware Completion (JSON body)
+
+```bash
+curl -X POST "http://localhost:8000/api/note/complete/context" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "q": "met",
+    "section": "medications",
+    "rows": 10,
+    "patient_context_json": {
+      "conditions": ["Type 2 diabetes mellitus"],
+      "medications": ["Metformin"]
+    }
+  }'
+```
+
+### List Valid Sections
+
+```bash
+curl "http://localhost:8000/api/note/sections"
+```
+
+## Testing
+
+Run the test suite with:
 
 ```bash
 pytest -q
 ```
 
-## Notes
+Tests cover section validation, response shape, fuzzy fallback, and ranking/filter behavior for multiple note sections.
 
-- Existing filenames were preserved per refactor constraints.
-- Logic was not changed except import/path updates required by file movement.
+## Data and Indexing Utilities
+
+The `scripts/` directory contains helper scripts for Solr data preparation and index updates (for example source/TTY priority updates and word-count enrichments). These scripts are useful when rebuilding or tuning the search index.
+
+## Operational Notes
+
+- The API includes CORS middleware configured with permissive defaults.
+- The backend relies on Solr availability for autocomplete/search endpoints.
+- Request resilience includes guarded fallbacks and service-unavailable responses for upstream failures.
+
+## Compatibility
+
+Compatibility import used by tests and legacy callers is preserved:
+
+```python
+from backend import app
+```
