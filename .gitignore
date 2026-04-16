@@ -14,3 +14,6 @@ data/*.log
 
 # Pytest/cache
 .pytest_cache/
+.codex
+.env
+.vscode/

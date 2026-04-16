@@ -168,7 +168,7 @@ Then open:
 The repository includes `infra/docker-compose.dev.yml` with dev-oriented overrides. It is intended as an override layer and may reference services not defined in the base compose file.
 
 ```bash
-docker compose -f docker-compose.yml -f infra/docker-compose.dev.yml up --build
+docker compose -f docker-compose.yml -f infra/docker-compose.dev.yml up --build 
 ```
 
 ## Example API Usage

@@ -10,7 +10,8 @@ import time
 import logging
 from logging.handlers import RotatingFileHandler
 from typing import Optional
-
+from dotenv import load_dotenv
+load_dotenv()  # loads .env from current working directory
 # ─────────────────────────────────────────
 # FILTERS CONFIG
 # ─────────────────────────────────────────
@@ -54,7 +55,9 @@ TTY_PRIORITY_MAP = {
     "FN": 4,
     "AB": 5,
 }
-
+SOLR_URL = os.getenv("SOLR_URL")
+if not SOLR_URL:
+    raise RuntimeError("SOLR_URL environment variable is not set!")
 SOURCE_PRIORITY_MAP = {
     "SNOMEDCT_US": 1,
     "ICD10CM": 2,

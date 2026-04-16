@@ -10,5 +10,5 @@ data/
 
 *.log
 .env
-
+.codex
 README.md
